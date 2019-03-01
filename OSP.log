@@ -1,0 +1,190 @@
+Sim: 0 [EventEngine.EventDriver]  
+	Simulation Start Time: Fri Mar 01 09:14:41 EST 2019
+	Parameter file: Misc\params.osp
+
+	Legend:
+	  Thread(X:Y/S) means: thread X of task Y, status=S
+	  Task(X/S) means: task X, status=S
+	  Page(X:Y/Z) means: page X of task Y in frame Z
+	  Openfile(X:Y/Z) means: open file X of task Y on device Z
+	  Port(X:Y/S) means: port X of task Y has status S
+	Status code abbreviations:
+	  RD(ThreadReady), RU(ThreadRunning),
+	  Wn(ThreadWaiting, n=waitlevel), KL(ThreadKill)
+	  L(TaskLive), T(TaskTerm), NN(NONE)
+	  L(PortLive), D(PortDestroyed), NN(NONE)
+
+
+Sim: 0 [IFLModules.ResourceCB]  
+	Deadlock handling mode: Detection
+Sim: 0 [IFLModules.TaskCB]  
+	Entering create()
+Mod: 0 [Tasks.TaskCB]  
+	Task(1/NN) created
+Sim: 0 [IFLModules.FileSys]  
+	Creating file: create(/vm/1,65536)
+Mod: 0 [FileSys.FileSys]  
+	Creating file: create(/vm/1,65536)
+Mod: 0 [FileSys.FileSys]  
+	New file size 64 blocks
+Mod: 0 [FileSys.FileSys]  
+	Inode(Id(0),Device(0),BlockCount(64),OpenCount(0),LinkCount(1))
+	  File `/vm/1', blocksize=64 created on device 0
+Sim: 0 [IFLModules.FileSys]  
+	System call create(`/vm/1')  succeeded, as expected
+Sim: 0 [IFLModules.OpenFile]  
+	System call open(`/vm/1')
+Sim: 0 [Tasks.TaskCB]  
+	Adding Openfile(0:1/0) to the open files table of Task(1/L)
+Mod: 0 [FileSys.OpenFile]  
+	File `/vm/1' opened 1 times
+Sim: 0 [IFLModules.OpenFile]  
+	File `/vm/1' opened as Openfile(0:1/0)
+Sim: 0 [IFLModules.FileSys]  
+	System call open(`/vm/1')  succeeded, as expected
+Sim: 0 [IFLModules.ThreadCB]  
+	Trying to create new thread for Task(1/L)
+Sim: 0 <<Warning!>> [IFLModules.ThreadCB]  
+	After do_create(null): dispatch() should have been called
+
+	at osp.IFLModules.IflThreadCB.N(IflThreadCB.java:577)
+	at osp.IFLModules.IflThreadCB.for(IflThreadCB.java:612)
+	at osp.Tasks.TaskCB.bo(TaskCB.java:119)
+	at osp.IFLModules.IflTaskCB.bg(IflTaskCB.java:250)
+	at osp.IFLModules.CallbackTaskCreate.voidCallback(IflTaskCB.java:898)
+	at osp.EventEngine.EventCallback.Activate(EventCallback.java:48)
+	at osp.EventEngine.EventDriver.go(EventDriver.java:124)
+	at osp.EventEngine.EngineThread.run(EngineThread.java:60)
+Sim: 0 <<Error!>> [IFLModules.ThreadCB]  
+	Failed to create new thread for Task(1/L) when success was expected
+
+	at osp.IFLModules.IflThreadCB.for(IflThreadCB.java:649)
+	at osp.Tasks.TaskCB.bo(TaskCB.java:119)
+	at osp.IFLModules.IflTaskCB.bg(IflTaskCB.java:250)
+	at osp.IFLModules.CallbackTaskCreate.voidCallback(IflTaskCB.java:898)
+	at osp.EventEngine.EventCallback.Activate(EventCallback.java:48)
+	at osp.EventEngine.EventDriver.go(EventDriver.java:124)
+	at osp.EventEngine.EngineThread.run(EngineThread.java:60)
+
+Sim:0 [Utilities.SnapshotTaker]  
+	
+
+[Snapshot at 0]
+
+MEMORY:
+  Free frames: 30(100%) out of 30
+  Locked frames: 0 out of 30
+  Reserved frames: 0 out of 30
+  Referenced frames: 0 out of 30
+
+Memory map:
+|----------|------------------------------|
+|Frame     |000000000011111111112222222222|
+|number    |012345678901234567890123456789|
+|----------|------------------------------|
+|free      |FFFFFFFFFFFFFFFFFFFFFFFFFFFFFF|
+|lock      |000000000000000000000000000000|
+|reserved  |                              |
+|dirty     |                              |
+|referenced|                              |
+|----------|------------------------------|
+|          |                              |
+|page      |                              |
+|number    |                              |
+|----------|------------------------------|
+|          |                              |
+|owner     |                              |
+|task      |                              |
+|----------|------------------------------|
+
+
+
+DEVICES:
+  Device 0: Swap Device   (mount point: /vm/)
+	    Number of pages read = 0
+	    Number of pages written = 0
+	    Average number of cylinders swept per disk access = 0
+	      Total number of cylinders swept = 0
+	    Service time per I/O request: 0
+	    Device queue:  Empty
+  Device 1: Disk   (mount point: /etc/go/)
+	    Number of pages read = 0
+	    Number of pages written = 0
+	    Average number of cylinders swept per disk access = 0
+	      Total number of cylinders swept = 0
+	    Service time per I/O request: 0
+	    Device queue:  Empty
+  Device 2: Disk   (mount point: /etc/)
+	    Number of pages read = 0
+	    Number of pages written = 0
+	    Average number of cylinders swept per disk access = 0
+	      Total number of cylinders swept = 0
+	    Service time per I/O request: 0
+	    Device queue:  Empty
+
+TASKS and THREADS:
+  CPU Utilization: NaN%
+  Average service time per thread: NaN
+  Average normalized service time per thread: NaN
+  Total number of tasks: 0
+  Running thread(s): none
+  Threads summary: 0 alive
+  Among live threads: 0 running
+                      0 suspended
+                      0 ready
+  ready queue = ()
+  running thread(s) = ()
+  waiting thread(s) = ()
+  thread(s) in pagefault = ()
+  killed thread(s) = ()
+
+FILES:
+  Total number of files: 0
+  Total number of directories: 3
+  Total number of open files: 0
+  Device 0: 1472 out of 1536 blocks are free, 4.166669% used
+  Device 1: 40 out of 40 blocks are free, 0.0% used
+  Device 2: 16 out of 16 blocks are free, 0.0% used
+
+
+PORTS:
+  Number of Live Ports: 	0
+  Number of Ports Created: 	0
+  Number of Ports Destroyed: 	0
+  Number of Messages Sent: 	0
+  Number of Messages Received: 	0
+
+
+
+RESOURCES:
+  Total number of acquire() calls: 0
+  Total number of release() calls: 0
+
+    Resource Availability Table
+|---------------|-------------------------|
+|Resource Type  |0    1    2    3    4    |
+|---------------|-------------------------|
+|  Total        |8    8    8    6    9    |
+|---------------|-------------------------|
+|  Available    |8    8    8    6    9    |
+|---------------|-------------------------|
+
+
+
+    Resource Allocation Table
+|------------------|-----------------------------------|
+|Resource Type     |0      1      2      3      4      |
+|------------------|-----------------------------------|
+|------------------|-----------------------------------|
+
+
+
+
+The suspended  RRBs: 
+
+
+-----------------------------------------------
+
+Sim: 0 [Utilities.Simulation]  
+	Elapsed time: 0 seconds
+
