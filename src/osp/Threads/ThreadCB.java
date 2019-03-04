@@ -102,7 +102,6 @@ public class ThreadCB extends IflThreadCB
 	   	   return thread;
     	}
     	
-    	//testing
     }
 
     /** 
