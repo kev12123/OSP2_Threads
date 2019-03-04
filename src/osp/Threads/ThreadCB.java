@@ -9,6 +9,7 @@ import osp.Hardware.*;
 import osp.Devices.*;
 import osp.Memory.*;
 import osp.Resources.*;
+import osp.Utilities.*;
 
 /*
  * Kevin Giraldo
@@ -23,7 +24,9 @@ import osp.Resources.*;
    @OSPProject Threads
 */
 public class ThreadCB extends IflThreadCB 
-{
+{   
+	
+	private static GenericList readyQueue;
     /**
        The thread constructor. Must call 
 
@@ -49,9 +52,7 @@ public class ThreadCB extends IflThreadCB
     */
     public static void init()
     {
-        // your code goes here
-    	//create ready queue ?
-
+    	readyQueue = new GenericList();
     }
 
     /** 
@@ -76,26 +77,29 @@ public class ThreadCB extends IflThreadCB
         // your code goes here
     	//creating thread object using  deafault constructor
     	if(task.getThreadCount() > ThreadCB.MaxThreadsPerTask) {
-	    	ThreadCB thread = new ThreadCB();
-	    	//linking thread to its task , if add thread fails then we return FAILURE
-	    	if(task.addThread(thread) == FAILURE) {
-	    		return null;
-	    	}
-	    	//associate thread with task 
-	    	thread.setTask(task);
-	    	
-	    	
-	    	//set threads initial priority , the priority of the thread is determined by
-	    	//PRIORITY = (total time the thread was waiting in the ready queue) / 
-	    	//             (1+ total CPU time all the threads in the same task have used so far)
-	    	
-	    	//set thread to ready state
-	    	thread.setStatus(ThreadReady);
-	   	   return thread;
+    		dispatch();
+    		return null;
     	}
     	else {
-    		
-    		return null;
+    			
+    		ThreadCB thread = new ThreadCB();
+    		//associate thread with task 
+	    	thread.setTask(task);
+	    	//linking thread to its task , if add thread fails then we return FAILURE
+	    	if(task.addThread(thread) == FAILURE) {
+	    		dispatch();
+	    		return null;
+	    	}
+	    	//set priority of thread
+	    	thread.setPriority((int) getPriority(task, thread));
+	    	//set thread to ready state
+	    	thread.setStatus(ThreadReady);
+	    	//insert thread into ready queue
+	    	readyQueue.append(thread);
+	    	
+	    	//call dispatch method
+	    	dispatch();
+	   	   return thread;
     	}
     }
 
@@ -119,50 +123,44 @@ public class ThreadCB extends IflThreadCB
     		
     		//remove from ready queue
     		
-    		
-    		//number of operations need to be performed
-    		//A thread being destroyed might have initiated  an I/O operation
-    		// and this is suspended on the corresponding IORB , in order to do this
-    		//we scan devices in the table and cancel the pending ones
-    		// 
-    		for(int i = 0 ; i < Device.getTableSize() ; i++) {
-    			
-    			Device.get(i).cancelPendingIO(this);
-    		}
-    		//resources consumed by thread release into the pool
-    		ResourceCB.giveupResources(this);
-    		
     		//set status to ThreadKill
     		this.setStatus(ThreadKill);
     		//checking if corresponding thread task 
-    		if(this.getTask().getThreadCount() == 0) {
-    			//kill task since it has no threads left
-    			this.getTask().kill(); 
-    		}
     		
-    		//dispatch a new thread by scanning ready queue and selecting which
-    		//thread to dispatch
+    		if(taskHasThreads(this)) this.getTask().kill();  //kill task since it has no threads left
+    		
+   
+    	}
+    	else if(this.getStatus() == ThreadWaiting) {
+    		 
+    		this.setStatus(ThreadKill);
+    		cancelAllIODevices(this);
+    		//resources consumed by thread release into the pool
+    		ResourceCB.giveupResources(this);
+    		if(taskHasThreads(this)) this.getTask().kill();
+    			
     	}
     	else if(this.getStatus() == ThreadRunning){
     		
+    		this.setStatus(ThreadKill);
     		//number of operations need to be performed
     		//A thread being destroyed might have initiated  an I/O operation
     		// and this is suspended on the corresponding IORB , in order to do this
     		//we scan devices in the table and cancel the pending ones
     		// 
-    		for(int i = 0 ; i < Device.getTableSize() ; i++) {
-    			
-    			Device.get(i).cancelPendingIO(this);
-    		}
+    		cancelAllIODevices(this);
     		//resources consumed by thread release into the pool
     		ResourceCB.giveupResources(this);
-    		this.setStatus(ThreadKill);
+    		
+    		do_dispatch(); // dispatch new thread
+    		if(taskHasThreads(this)) this.getTask().kill();
+    		
     	}
     
     	
     }
 
-    /** Suspends the thread that is currenly on the processor on the 
+    /** Suspends the thread that is currently on the processor on the 
         specified event. 
 
         Note that the thread being suspended doesn't need to be
@@ -180,7 +178,19 @@ public class ThreadCB extends IflThreadCB
     */
     public void do_suspend(Event event)
     {
-        // your code goes here
+         
+    	if(event.contains(this)) {
+    		
+    		if(this.getStatus() == ThreadRunning) {
+    			this.setStatus(ThreadWaiting);
+    			//thread must lose control of the CPU   -------- HOW TO SWITCH CONTROL OF THE CPU --------
+    			dispatch();
+    		}
+    		else if(this.getStatus() == ThreadWaiting) {
+    			this.setStatus(ThreadWaiting+1);
+    			dispatch();
+    		}
+    	}
 
     }
 
@@ -251,9 +261,44 @@ public class ThreadCB extends IflThreadCB
     /*
        Feel free to add methods/fields to improve the readability of your code
     */
-
+    
+    /** Method used to scan all devices in device table and cancel them
+     * for the respective thread
+   
+    @OSPProject Threads
+ */
+    
+    private void cancelAllIODevices(ThreadCB thread) {
+    	
+    	for(int i = 0 ; i < Device.getTableSize() ; i++) {
+			
+			Device.get(i).cancelPendingIO(thread);
+		}
+    }
+    
+    
+    private boolean taskHasThreads(ThreadCB thread) {
+    	
+    	//checking if corresponding thread task 
+		if(this.getTask().getThreadCount() == 0) return true;
+		
+		return false;
+    	
+    }
+    
+    private static double getPriority(TaskCB task , ThreadCB thread){
+    	
+    	//set threads initial priority , the priority of the thread is determined by
+    	//PRIORITY = (total time the thread was waiting in the ready queue) / 
+    	//(1+ total CPU time all the threads in the same task have used so far
+    	 
+    	return (thread.getCreationTime() / (1 + task.getTimeOnCPU()));
+    }
+ 
 }
 
 /*
       Feel free to add local classes to improve the readability of your code
 */
+
+
