@@ -1,6 +1,11 @@
 package osp.Threads;
 import java.util.Vector;
+import java.util.ArrayList;
 import java.util.Enumeration;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+
 import osp.Utilities.*;
 import osp.IFLModules.*;
 import osp.Tasks.*;
@@ -11,7 +16,7 @@ import osp.Memory.*;
 import osp.Resources.*;
 import osp.Utilities.*;
 
-/*
+/*     
  * Kevin Giraldo
  * 110653109
  */
@@ -26,8 +31,9 @@ import osp.Utilities.*;
 public class ThreadCB extends IflThreadCB 
 {   
 	
-	private static GenericList readyQueue;
-    /**
+	//private static GenericList readyQueue;
+	static Map<Double,ArrayList<ThreadCB>> readyQueues;
+    /**      
        The thread constructor. Must call 
 
        	   super();
@@ -52,7 +58,7 @@ public class ThreadCB extends IflThreadCB
     */
     public static void init()
     {
-    	readyQueue = new GenericList();
+    	readyQueues = new TreeMap<>();
     }
 
     /** 
@@ -91,11 +97,20 @@ public class ThreadCB extends IflThreadCB
 	    		return null;
 	    	}
 	    	//set priority of thread
-	    	thread.setPriority((int) getPriority(task, thread));
+	    	//thread.setPriority((int) getPriority(task, thread));
 	    	//set thread to ready state
 	    	thread.setStatus(ThreadReady);
 	    	//insert thread into ready queue
-	    	readyQueue.append(thread);
+	    	if(!readyQueues.containsKey(getPriority(task,thread))){
+	    			ArrayList<ThreadCB> list = new ArrayList<ThreadCB>();
+	    			list.add(thread);
+	    			readyQueues.put(getPriority(task,thread), list);
+	    	}
+	    	else {
+	    		
+	    		readyQueues.get(getPriority(task,thread)).add(thread);
+	    		
+	    	}
 	    	
 	    	//call dispatch method
 	    	dispatch();
@@ -119,29 +134,28 @@ public class ThreadCB extends IflThreadCB
     */
     public void do_kill()
     {
-        // destroy threads by setting status to ThreadKill and a number of other actions mus be performed
+        // if thread is read then it must be removed from the ready queue
     	if(this.getStatus() == ThreadReady) {
     		
-    		//remove from ready queue
-    		
+    		//remove thread from ready queue
+    		readyQueues.get(getPriority(this.getTask(),this)).remove(this);
     		//set status to ThreadKill
     		this.setStatus(ThreadKill);
-    		//checking if corresponding thread task 
-    		
-    		if(taskHasThreads(this)) this.getTask().kill();  //kill task since it has no threads left
     		
    
     	}
     	else if(this.getStatus() == ThreadWaiting) {
     		 
     		this.setStatus(ThreadKill);
-    		cancelAllIODevices(this);
-    		//resources consumed by thread release into the pool
-    		ResourceCB.giveupResources(this);
-    		if(taskHasThreads(this)) this.getTask().kill();
     			
     	}
     	else if(this.getStatus() == ThreadRunning){
+    		//the running thread must be removed from the cpu 
+    		//since we're changinng the state of the currently running hrread fromom thread running 
+    		//we first set the page table register to null
+    		MMU.setPTBR(null);
+    		//change current thread to null
+    		this.getTask().setCurrentThread(null);
     		
     		this.setStatus(ThreadKill);
     		//number of operations need to be performed
@@ -149,14 +163,20 @@ public class ThreadCB extends IflThreadCB
     		// and this is suspended on the corresponding IORB , in order to do this
     		//we scan devices in the table and cancel the pending ones
     		// 
-    		cancelAllIODevices(this);
-    		//resources consumed by thread release into the pool
-    		ResourceCB.giveupResources(this);
-    		
-    		do_dispatch(); // dispatch new thread
-    		if(taskHasThreads(this)) this.getTask().kill();
+    	
     		
     	}
+    	
+    	cancelAllIODevices(this);
+		//resources consumed by thread release into the pool
+		ResourceCB.giveupResources(this);
+		
+		// dispatch new thread
+		do_dispatch();
+		
+		//check if corresponding task has any threads left
+		if(taskHasThreads(this)) this.getTask().kill();
+		
     
     	
     }
@@ -180,18 +200,28 @@ public class ThreadCB extends IflThreadCB
     public void do_suspend(Event event)
     {
          
-    	if(event.contains(this)) {
+    	
     		
     		if(this.getStatus() == ThreadRunning) {
+    			//since thread is changing from thread running 	//thread must lose control of the CPU   
+    			//we first set the page table register to null
     			this.setStatus(ThreadWaiting);
-    			//thread must lose control of the CPU   -------- HOW TO SWITCH CONTROL OF THE CPU --------
-    			dispatch();
+        		//change current thread to null
+        		this.getTask().setCurrentThread(null);
+        		MMU.setPTBR(null);
+    			
+    		
     		}
-    		else if(this.getStatus() == ThreadWaiting) {
-    			this.setStatus(ThreadWaiting+1);
-    			dispatch();
+    		else if(this.getStatus() >= ThreadWaiting) {
+    			this.setStatus(this.getStatus()+1);
+    		
     		}
-    	}
+    		
+    		event.addThread(this);
+    	
+    	
+
+		dispatch();
 
     }
 
@@ -205,10 +235,23 @@ public class ThreadCB extends IflThreadCB
 	@OSPProject Threads
     */
     public void do_resume()
-    {
-        // your code goes here
-    	MyOut.print(this,"RESUMING" + this);
-
+    {   
+    	if(this.getStatus() > ThreadWaiting) {
+    		
+    		this.setStatus(this.getStatus()-1);
+    	
+    	}
+    	else if(this.getStatus()==ThreadWaiting) {
+        	
+    		//since the thread becomes ready it should be placed in the 
+        	//ready queue
+        	readyQueues.get(getPriority(this.getTask(),this)).add(this);
+        	this.setStatus(ThreadReady);
+        	
+    	}
+    	
+    	dispatch();
+        
     }
 
     /** 
@@ -226,9 +269,29 @@ public class ThreadCB extends IflThreadCB
     */
     public static int do_dispatch()
     {
-        // your code goes here
     	
-    	return 0;
+    	ThreadCB thread = null;
+    	Set<Double> keys = readyQueues.keySet();
+    	for(Double priorities: keys) {
+    		if(!readyQueues.get(priorities).isEmpty()) {
+    			thread = readyQueues.get(priorities).remove(0);
+    			break;
+    		}
+    	}
+    	
+    	if(thread==null)
+    		return FAILURE;
+    	
+    	MMU.setPTBR(thread.getTask().getPageTable());
+    	thread.getTask().setCurrentThread(thread);
+    	thread.setStatus(ThreadRunning);
+    	//since new thread is chosen we must perform a context switch
+    	
+    	
+    	//when a thread is dispatched it is given a time slice of 100 time unit
+    	HTimer.set(100);
+    	
+    	return SUCCESS;
     }
 
     /**
