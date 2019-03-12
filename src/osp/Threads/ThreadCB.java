@@ -32,7 +32,7 @@ public class ThreadCB extends IflThreadCB
 {   
 	
 	//private static GenericList readyQueue;
-	static Map<Double,ArrayList<ThreadCB>> readyQueues;
+	static GenericList readyQueue;
     /**      
        The thread constructor. Must call 
 
@@ -58,7 +58,7 @@ public class ThreadCB extends IflThreadCB
     */
     public static void init()
     {
-    	readyQueues = new TreeMap<>();
+    	readyQueue = new GenericList();
     }
 
     /** 
@@ -101,17 +101,7 @@ public class ThreadCB extends IflThreadCB
 	    	//set thread to ready state
 	    	thread.setStatus(ThreadReady);
 	    	//insert thread into ready queue
-	    	if(!readyQueues.containsKey(getPriority(task,thread))){
-	    			ArrayList<ThreadCB> list = new ArrayList<ThreadCB>();
-	    			list.add(thread);
-	    			readyQueues.put(getPriority(task,thread), list);
-	    	}
-	    	else {
-	    		
-	    		readyQueues.get(getPriority(task,thread)).add(thread);
-	    		
-	    	}
-	    	
+	    	readyQueue.append(thread);
 	    	//call dispatch method
 	    	dispatch();
 	   	   return thread;
@@ -138,11 +128,11 @@ public class ThreadCB extends IflThreadCB
     	if(this.getStatus() == ThreadReady) {
     		
     		//remove thread from ready queue
-    		readyQueues.get(getPriority(this.getTask(),this)).remove(this);
+    		readyQueue.remove(this);
     		//set status to ThreadKill
     		this.setStatus(ThreadKill);
     		
-   
+    	
     	}
     	else if(this.getStatus() == ThreadWaiting) {
     		 
@@ -172,7 +162,7 @@ public class ThreadCB extends IflThreadCB
 		ResourceCB.giveupResources(this);
 		
 		// dispatch new thread
-		do_dispatch();
+		dispatch();
 		
 		//check if corresponding task has any threads left
 		if(taskHasThreads(this)) this.getTask().kill();
@@ -221,7 +211,7 @@ public class ThreadCB extends IflThreadCB
     	
     	
 
-		dispatch();
+    		dispatch();
 
     }
 
@@ -245,7 +235,7 @@ public class ThreadCB extends IflThreadCB
         	
     		//since the thread becomes ready it should be placed in the 
         	//ready queue
-        	readyQueues.get(getPriority(this.getTask(),this)).add(this);
+        	readyQueue.append(this);
         	this.setStatus(ThreadReady);
         	
     	}
@@ -269,24 +259,38 @@ public class ThreadCB extends IflThreadCB
     */
     public static int do_dispatch()
     {
-    	
+    	//Check for thread currently on the processor and reschedule it
+    
     	ThreadCB thread = null;
-    	Set<Double> keys = readyQueues.keySet();
-    	for(Double priorities: keys) {
-    		if(!readyQueues.get(priorities).isEmpty()) {
-    			thread = readyQueues.get(priorities).remove(0);
-    			break;
-    		}
+        
+    	try {
+    		
+    		thread = MMU.getPTBR().getTask().getCurrentThread();
+    	}catch(NullPointerException e) {}
+    	
+    	if(thread != null) {
+    		thread.getTask().setCurrentThread(null);
+    		MMU.setPTBR(null);
+    		thread.setStatus(ThreadReady);
+    		//add to ready queue
+    		readyQueue.append(thread);
     	}
     	
-    	if(thread==null)
+    	//check if ready queue is empty in this case we return 
+    	//failure
+    	if(readyQueue.isEmpty()) {
+    		MMU.setPTBR(null);
     		return FAILURE;
-    	
-    	MMU.setPTBR(thread.getTask().getPageTable());
-    	thread.getTask().setCurrentThread(thread);
-    	thread.setStatus(ThreadRunning);
-    	//since new thread is chosen we must perform a context switch
-    	
+    	}else {
+    		
+    		//Get new ready thread from the ready queue , update PTBR and status of thread accordingly
+    		thread = (ThreadCB) readyQueue.removeHead();
+    		//since new thread is chosen we must perform a context switch 
+    		MMU.setPTBR(thread.getTask().getPageTable());
+        	thread.getTask().setCurrentThread(thread);
+        	thread.setStatus(ThreadRunning);
+    		
+    	}
     	
     	//when a thread is dispatched it is given a time slice of 100 time unit
     	HTimer.set(100);
