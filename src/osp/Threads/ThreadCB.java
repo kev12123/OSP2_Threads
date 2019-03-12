@@ -127,18 +127,18 @@ public class ThreadCB extends IflThreadCB
         // if thread is read then it must be removed from the ready queue
     	if(this.getStatus() == ThreadReady) {
     		
-    		//remove thread from ready queue
-    		readyQueue.remove(this);
     		//set status to ThreadKill
+    		readyQueue.remove(this);
     		this.setStatus(ThreadKill);
+    		
     		
     	
     	}
-    	else if(this.getStatus() == ThreadWaiting) {
-    		 
-    		this.setStatus(ThreadKill);
-    			
-    	}
+//    	else if(this.getStatus() == ThreadWaiting) {
+//    		 
+//    		this.setStatus(ThreadKill);
+//    			
+//    	}
     	else if(this.getStatus() == ThreadRunning){
     		//the running thread must be removed from the cpu 
     		//since we're changinng the state of the currently running hrread fromom thread running 
@@ -157,6 +157,10 @@ public class ThreadCB extends IflThreadCB
     		
     	}
     	
+    	//removing thread task list
+    	this.getTask().removeThread(this);
+    	//set kill status for waiting thread
+    	this.setStatus(ThreadKill);
     	cancelAllIODevices(this);
 		//resources consumed by thread release into the pool
 		ResourceCB.giveupResources(this);
@@ -190,19 +194,20 @@ public class ThreadCB extends IflThreadCB
     public void do_suspend(Event event)
     {
          
-    	
-    		
     		if(this.getStatus() == ThreadRunning) {
-    			//since thread is changing from thread running 	//thread must lose control of the CPU   
+    			//since thread is changing from thread running 	//thread must lose control of the CPU  
+    
     			//we first set the page table register to null
-    			this.setStatus(ThreadWaiting);
-        		//change current thread to null
+    			MMU.setPTBR(null); 
+    			//change current thread to null
         		this.getTask().setCurrentThread(null);
-        		MMU.setPTBR(null);
-    			
-    		
+        		//set status of thread to waiting
+    			this.setStatus(ThreadWaiting);
+        		
+        	
     		}
     		else if(this.getStatus() >= ThreadWaiting) {
+    			
     			this.setStatus(this.getStatus()+1);
     		
     		}
@@ -235,8 +240,10 @@ public class ThreadCB extends IflThreadCB
         	
     		//since the thread becomes ready it should be placed in the 
         	//ready queue
+    		//set status of thread to ready then add to the queue
+    		this.setStatus(ThreadReady);
         	readyQueue.append(this);
-        	this.setStatus(ThreadReady);
+        
         	
     	}
     	
