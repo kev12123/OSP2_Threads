@@ -2,6 +2,7 @@ package osp.Threads;
 import java.util.Vector;
 import java.util.ArrayList;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -31,8 +32,15 @@ import osp.Utilities.*;
 public class ThreadCB extends IflThreadCB 
 {   
 	
-	//private static GenericList readyQueue;
-	static GenericList readyQueue;
+	private static GenericList readyQueue;
+	//create hashmap that will hold the task and the threads
+	//the purpose of this hashmap is to use the task as keys and a list of
+	//threads as the  value of each key/task this will allow the easy calculation
+	//of total CPU time time of all threads in the same tasks
+	
+	private static HashMap taskTracker;
+	
+    
     /**      
        The thread constructor. Must call 
 
@@ -59,6 +67,7 @@ public class ThreadCB extends IflThreadCB
     public static void init()
     {
     	readyQueue = new GenericList();
+    	taskTracker = new HashMap();
     }
 
     /** 
