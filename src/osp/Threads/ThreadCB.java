@@ -1,6 +1,8 @@
 package osp.Threads;
 import java.util.Vector;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
@@ -29,16 +31,25 @@ import osp.Utilities.*;
 
    @OSPProject Threads
 */
-public class ThreadCB extends IflThreadCB 
+public class ThreadCB extends IflThreadCB implements Comparable<ThreadCB>
 {   
-	
-	private static GenericList readyQueue;
-	//create hashmap that will hold the task and the threads
-	//the purpose of this hashmap is to use the task as keys and a list of
-	//threads as the  value of each key/task this will allow the easy calculation
-	//of total CPU time time of all threads in the same tasks
+	/*
+	 * ArrayList used with  FIFO insertion 
+	 * this ArrayList stores the ready threads
+	 * in descending priority 
+	 */
+	private static ArrayList<ThreadCB> readyQueue;
+
+
+	/*
+	 * hash-map that will hold the task and the threads
+	 * the purpose of this hash-map is to use the task as keys and a list of
+	 * threads as the  value of each key/task this will allow the easy calculation
+	 * of total CPU time time of all threads in the same tasks
+	 */
 	
 	private static HashMap<TaskCB, GenericList> taskTracker;
+	
 	
     
     /**      
@@ -66,7 +77,7 @@ public class ThreadCB extends IflThreadCB
     */
     public static void init()
     {
-    	readyQueue = new GenericList();
+    	readyQueue = new ArrayList<ThreadCB>();
     	taskTracker = new HashMap<TaskCB,GenericList>();
     }
 
@@ -108,11 +119,13 @@ public class ThreadCB extends IflThreadCB
 	    		return null;
 	    	}
 	    	//set priority of thread
-	    	//thread.setPriority((int) getPriority(task, thread));
+	    	thread.setPriority((int) getPriority(task, thread));
 	    	//set thread to ready state
 	    	thread.setStatus(ThreadReady);
 	    	//insert thread into ready queue
-	    	readyQueue.append(thread);
+	    	readyQueue.add(thread);
+	    	//sort prorities
+	    	Collections.sort(readyQueue);
 	    	//call dispatch method
 	    	dispatch();
 	   	   return thread;
@@ -140,10 +153,9 @@ public class ThreadCB extends IflThreadCB
     		
     		//set status to ThreadKill
     		readyQueue.remove(this);
-    		this.setStatus(ThreadKill);
-    		
-    		
-    	
+    		//this.setStatus(ThreadKill);
+    		Collections.sort(readyQueue);
+    
     	}
 //    	else if(this.getStatus() == ThreadWaiting) {
 //    		 
@@ -158,7 +170,7 @@ public class ThreadCB extends IflThreadCB
     		//change current thread to null
     		this.getTask().setCurrentThread(null);
     		
-    		this.setStatus(ThreadKill);
+    		//this.setStatus(ThreadKill);
     		//number of operations need to be performed
     		//A thread being destroyed might have initiated  an I/O operation
     		// and this is suspended on the corresponding IORB , in order to do this
@@ -170,15 +182,18 @@ public class ThreadCB extends IflThreadCB
     	
     	//removing thread task list
     	this.getTask().removeThread(this);
+    	//remove thread from task in tracker list
+    	removeThreadFromTrackerList(this);
     	//set kill status for waiting thread
     	this.setStatus(ThreadKill);
     	cancelAllIODevices(this);
-		//resources consumed by thread release into the pool
+		//resources consumed by thread released into the pool of available 
 		ResourceCB.giveupResources(this);
 		
 		// dispatch new thread
 		dispatch();
-		
+		//sort prorities
+    	//Collections.sort(readyQueue, prc);
 		//check if corresponding task has any threads left
 		if(taskHasThreads(this)) this.getTask().kill();
 		
@@ -253,7 +268,11 @@ public class ThreadCB extends IflThreadCB
         	//ready queue
     		//set status of thread to ready then add to the queue
     		this.setStatus(ThreadReady);
-        	readyQueue.append(this);
+    		
+        	readyQueue.add(this);
+        	//this.setPriority((int) getPriority(task, this)); //I think makes sense to also recalculate priority here since the thread is being added to the readyQueue
+        	//however for some reason this method prevents the program from runni
+        	Collections.sort(readyQueue);
         
         	
     	}
@@ -291,7 +310,9 @@ public class ThreadCB extends IflThreadCB
     		MMU.setPTBR(null);
     		thread.setStatus(ThreadReady);
     		//add to ready queue
-    		readyQueue.append(thread);
+    		readyQueue.add(thread);
+    		thread.setPriority((int) getPriority(thread.getTask(), thread));
+    		Collections.sort(readyQueue);
     	}
     	
     	//check if ready queue is empty in this case we return 
@@ -302,7 +323,7 @@ public class ThreadCB extends IflThreadCB
     	}else {
     		
     		//Get new ready thread from the ready queue , update PTBR and status of thread accordingly
-    		thread = (ThreadCB) readyQueue.removeHead();
+    		thread = (ThreadCB) readyQueue.remove(0);
     		//since new thread is chosen we must perform a context switch 
     		MMU.setPTBR(thread.getTask().getPageTable());
         	thread.getTask().setCurrentThread(thread);
@@ -377,6 +398,11 @@ public class ThreadCB extends IflThreadCB
     	
     }
     
+    
+    /*
+	 * getPriority returns priority of the thread based 
+	 * off the formula given
+	 */
     private static double getPriority(TaskCB task , ThreadCB thread){
     	
     	//set threads initial priority , the priority of the thread is determined by
@@ -388,8 +414,13 @@ public class ThreadCB extends IflThreadCB
    
     
     /*
-     * Adds task and threads to tracker hashmap
+     * addToTaskTracker adds a key and value to the map
+     * it first check if the key exists , if false then
+     * we put the new task and the and create a new list
+     * of threads for the tasks.
      * 
+     * if the key already exists then we get the threads list
+     * and append the new thread
      * 
      */
     private static void addToTaskTracker(TaskCB task  , ThreadCB thread) {
@@ -417,11 +448,27 @@ public class ThreadCB extends IflThreadCB
     	return totalTimeOfThreadsInTask;
     	
     }
+    
+    private static void removeThreadFromTrackerList(ThreadCB thread) {
+    	
+    	GenericList ttList = taskTracker.get(thread.getTask());
+    	
+    	ttList.remove(thread);
+    	
+    	
+    }
+
+	@Override
+	public int compareTo(ThreadCB o) {
+		// TODO Auto-generated method stub
+		return o.getPriority()-this.getPriority();
+	}
  
 }
 
 /*
       Feel free to add local classes to improve the readability of your code
 */
+
 
 
