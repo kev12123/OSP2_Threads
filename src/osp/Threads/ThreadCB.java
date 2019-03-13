@@ -1,27 +1,23 @@
 package osp.Threads;
-import java.util.Vector;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.Enumeration;
 import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
-
 import osp.Utilities.*;
 import osp.IFLModules.*;
 import osp.Tasks.*;
-import osp.EventEngine.*;
 import osp.Hardware.*;
 import osp.Devices.*;
 import osp.Memory.*;
 import osp.Resources.*;
-import osp.Utilities.*;
 
 /*     
- * Kevin Giraldo
- * 110653109
+ * Author: Kevin Giraldo
+ * ID: 	   110653109
+ * 
+ * 
+ * I pledge my honor that all parts of this project were done by me individually, without collaboration
+ *  with anyone, and without consulting any external sources that could help with similar projects.
  */
  
 
@@ -63,7 +59,6 @@ public class ThreadCB extends IflThreadCB implements Comparable<ThreadCB>
     */
     public ThreadCB()
     {
-        // your code goes here
     	//calling super as first statement
     	super();
 
@@ -436,6 +431,12 @@ public class ThreadCB extends IflThreadCB implements Comparable<ThreadCB>
     }
     
     
+    /* 
+     * getCpuTimeOfAllThreadsInTask finds the totalCpuTime by using
+     * the taskTracker that keeps track of task and its threads
+     * 
+     */
+    
     private static double getCpuTimeOfAllThreadsInTask(TaskCB task) {
     	
     	
@@ -448,6 +449,13 @@ public class ThreadCB extends IflThreadCB implements Comparable<ThreadCB>
     	return totalTimeOfThreadsInTask;
     	
     }
+    
+    
+    /* 
+     * removeThreadFromTrackerList , it removes the thread from the tracker list
+     * if the is removed from the task
+     * 
+     */
     
     private static void removeThreadFromTrackerList(ThreadCB thread) {
     	
