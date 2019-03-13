@@ -38,7 +38,7 @@ public class ThreadCB extends IflThreadCB
 	//threads as the  value of each key/task this will allow the easy calculation
 	//of total CPU time time of all threads in the same tasks
 	
-	private static HashMap taskTracker;
+	private static HashMap<TaskCB, GenericList> taskTracker;
 	
     
     /**      
@@ -67,7 +67,7 @@ public class ThreadCB extends IflThreadCB
     public static void init()
     {
     	readyQueue = new GenericList();
-    	taskTracker = new HashMap();
+    	taskTracker = new HashMap<TaskCB,GenericList>();
     }
 
     /** 
@@ -100,6 +100,8 @@ public class ThreadCB extends IflThreadCB
     		ThreadCB thread = new ThreadCB();
     		//associate thread with task 
 	    	thread.setTask(task);
+	    	//add task as key to hashmap and put thread into list
+	    	addToTaskTracker(task, thread);
 	    	//linking thread to its task , if add thread fails then we return FAILURE
 	    	if(task.addThread(thread) == FAILURE) {
 	    		dispatch();
@@ -363,8 +365,13 @@ public class ThreadCB extends IflThreadCB
     
     private boolean taskHasThreads(ThreadCB thread) {
     	
-    	//checking if corresponding thread task 
-		if(this.getTask().getThreadCount() == 0) return true;
+    	//checking if corresponding thread tasks has any threads
+    	//if it does not  then remove it from the taskTracker
+		if(this.getTask().getThreadCount() == 0) {
+			
+			taskTracker.remove(thread.getTask());
+			return true;
+		}
 		
 		return false;
     	
@@ -376,7 +383,39 @@ public class ThreadCB extends IflThreadCB
     	//PRIORITY = (total time the thread was waiting in the ready queue) / 
     	//(1+ total CPU time all the threads in the same task have used so far
     	 
-    	return (thread.getCreationTime() / (1 + task.getTimeOnCPU()));
+    	return ((HClock.get()-thread.getCreationTime()-thread.getTimeOnCPU()) / (1 + getCpuTimeOfAllThreadsInTask(task)));
+    }
+   
+    
+    /*
+     * Adds task and threads to tracker hashmap
+     * 
+     * 
+     */
+    private static void addToTaskTracker(TaskCB task  , ThreadCB thread) {
+    	
+    	if(!(taskTracker.containsKey(task))) {
+    		
+    		GenericList threadList = new GenericList();
+    		taskTracker.put(task, threadList);
+    	}else {
+    		
+    		taskTracker.get(task).append(thread);
+    	}
+    }
+    
+    
+    private static double getCpuTimeOfAllThreadsInTask(TaskCB task) {
+    	
+    	
+    	Enumeration<?> eNum  = taskTracker.get(task).forwardIterator();
+    	Double totalTimeOfThreadsInTask = 0.0;
+    	while(eNum.hasMoreElements()) {
+    		ThreadCB thread = (ThreadCB) eNum.nextElement();
+    		totalTimeOfThreadsInTask+= thread.getTimeOnCPU();
+    	}
+    	return totalTimeOfThreadsInTask;
+    	
     }
  
 }
